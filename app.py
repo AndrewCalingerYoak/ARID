@@ -17,8 +17,8 @@ st.markdown(
     """
     <style>
     [data-testid="stSidebar"] {
-        min-width: 350px;
-        max-width: 450px;
+        min-width: 600px;
+        max-width: 700px;
     }
     </style>
     """,
@@ -53,7 +53,7 @@ with st.sidebar:
     *University of Georgia*  
 
     **Colin McCabe**  
-    *Collaborator & Co-Investigator*
+    *Collaborator*
     """)
     
     st.divider()
