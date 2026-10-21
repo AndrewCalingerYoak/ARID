@@ -5,8 +5,6 @@ import librosa.display
 import joblib
 import matplotlib.pyplot as plt
 
-
-
 # Page configuration
 st.set_page_config(page_title="ARID - Bat Classifier", page_icon="🦇", layout="wide")
 
@@ -15,18 +13,17 @@ st.markdown(
     """
     <style>
     [data-testid="stSidebar"] {
-        min-width: 500px;
-        max-width: 600px;
+        min-width: 600;
+        max-width: 600;
     }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
-
 # --- SIDEBAR: AUTHOR INFO, COMMENTARY & LOGOS ---
 with st.sidebar:
-    st.image("bathead.png",  use_container_width=True)
+    st.image("bathead.png", use_container_width=True)
     st.title("About ARID")
     st.markdown("""
     **Bat Acoustic Rabies Identifier (ARID)** is a bioacoustic diagnostic pipeline designed to classify suspect rabid bat vocalizations.
@@ -35,9 +32,9 @@ with st.sidebar:
     st.divider()
     
     st.subheader("Principal Investigator")
-    st.image("me.jpg", width=150")
+    st.image("me.jpg", width=150, caption="Andrew Calinger-Yoak")
     st.markdown("""
-    **Andrew Calinger-Yoak**
+    **Andrew Calinger-Yoak**  
     **andrewyoak@gmail.com**  
     *Department of Biology*  
     *Otterbein University*  
@@ -48,17 +45,15 @@ with st.sidebar:
     st.divider()
     st.subheader("Co Investigators")
     st.markdown("""
-    **Dr Chloe Goodwin**
+    **Dr Chloe Goodwin**  
     *University of Georgia*
     """)
-    
     
     st.divider()
     
     st.subheader("Partner Organizations")
-    st.markdown("Special thanks to our collaborating institutions and wildlife centers providing data acquisition and support:")
+    st.markdown("Special thanks to our collaborating institutions and wildlife centers providing data acquisition and ecological support:")
     
-    # You can swap these with local image filenames once uploaded to GitHub, e.g., st.image("otterbein_logo.png", width=150)
     st.markdown("* Otterbein University")
     st.markdown("* The Ohio Wildlife Center, Humane Animal Rescue of Pittsburgh, Nebraska Wildlife Rehab, Humane Indiana Wildlife, Bat World MidCities, Houston Humane Society Wildlife Center, Misfits Rehab, Red Creek Wildlife Center, Bat Education and Rehabilitation of Grainger County, Bat Conservation and Rescue of Virginia, and others")
 
