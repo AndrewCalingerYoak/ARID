@@ -15,8 +15,8 @@ st.markdown(
     """
     <style>
     [data-testid="stSidebar"] {
-        min-width: 350px;
-        max-width: 450px;
+        min-width: 500px;
+        max-width: 600px;
     }
     </style>
     """,
@@ -35,7 +35,7 @@ with st.sidebar:
     st.divider()
     
     st.subheader("Principal Investigator")
-    st.image("me.jpg", width=150, caption="Andrew Calinger-Yoak")
+    st.image("me.jpg", width=150")
     st.markdown("""
     **Andrew Calinger-Yoak**
     **andrewyoak@gmail.com**  
