@@ -30,7 +30,7 @@ with st.sidebar:
     st.image("bathead.png", use_container_width=True)
     st.title("About ARID")
     st.markdown("""
-    **Bat Acoustic Rabies Identifier (ARID)** is a bioacoustic diagnostic pipeline designed to classify suspect rabid bat vocalizations.
+    **Acoustic Rabies Identifier (ARID)** is a bioacoustic diagnostic pipeline designed to classify suspect rabid bat vocalizations.
     """)
     
     st.divider()
@@ -120,7 +120,7 @@ def check_password():
     return True
 
 if check_password():
-    st.title("🦇 Bat Acoustic Rabies Identifier (ARID)")
+    st.title("🦇 Acoustic Rabies Identifier (ARID)")
     st.markdown("Upload a bat vocalization audio file and complete all metadata fields below to run automated multi-pulse detection, classification summary, and email reporting.")
 
     # --- BAT METADATA INPUT FORM ---
