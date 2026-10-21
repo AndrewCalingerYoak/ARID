@@ -4,7 +4,10 @@ import librosa
 import librosa.display
 import joblib
 import matplotlib.pyplot as plt
-
+import smtplib
+from email.message import EmailMessage
+import tempfile
+import os
 # Page configuration
 st.set_page_config(page_title="ARID - Bat Classifier", page_icon="🦇", layout="wide")
 
