@@ -8,6 +8,7 @@ import smtplib
 from email.message import EmailMessage
 import tempfile
 import os
+
 # Page configuration
 st.set_page_config(page_title="ARID - Bat Classifier", page_icon="🦇", layout="wide")
 
@@ -16,8 +17,8 @@ st.markdown(
     """
     <style>
     [data-testid="stSidebar"] {
-        min-width: 600;
-        max-width: 600;
+        min-width: 350px;
+        max-width: 450px;
     }
     </style>
     """,
@@ -46,11 +47,13 @@ with st.sidebar:
     """)
 
     st.divider()
-    st.subheader("Co Investigators")
+    st.subheader("Co-Principal Investigators")
     st.markdown("""
-    **Dr Chloe Goodwin**  
-    *University of Georgia*
-    **Colin McCabe**
+    **Dr. Chloe Goodwin**  
+    *University of Georgia*  
+
+    **Colin McCabe**  
+    *Collaborator & Co-Investigator*
     """)
     
     st.divider()
@@ -60,6 +63,7 @@ with st.sidebar:
     
     st.markdown("* Otterbein University")
     st.markdown("* The Ohio Wildlife Center, Humane Animal Rescue of Pittsburgh, Nebraska Wildlife Rehab, Humane Indiana Wildlife, Bat World MidCities, Houston Humane Society Wildlife Center, Misfits Rehab, Red Creek Wildlife Center, Bat Education and Rehabilitation of Grainger County, Bat Conservation and Rescue of Virginia, and others")
+
 # --- EMAIL NOTIFICATION HELPER ---
 def send_email_alert(audio_bytes, audio_name, prediction_label, confidence, metadata):
     try:
@@ -117,16 +121,16 @@ def check_password():
 
 if check_password():
     st.title("🦇 Bat Acoustic Rabies Identifier (ARID)")
-    st.markdown("Upload a bat vocalization audio file and record specimen details below to run automated pulse segmentation, classification, and email reporting.")
+    st.markdown("Upload a bat vocalization audio file and complete all metadata fields below to run automated pulse detection, classification, and email reporting.")
 
     # --- BAT METADATA INPUT FORM ---
     with st.form("bat_metadata_form"):
-        st.subheader("Specimen Metadata & Field Details")
+        st.subheader("Specimen Metadata & Field Details (All Fields Required)")
         col1, col2 = st.columns(2)
         with col1:
-            submitter_name = st.text_input("Submitting Organization / Rescuer Name")
+            submitter_name = st.text_input("Submitting Organization / Rescuer Name *")
             suspected_species = st.selectbox("Suspected / Visual Species ID", [
-                "Unknown / Unidentified",
+                "Select Species...",
                 "Big Brown Bat (Eptesicus fuscus)",
                 "Little Brown Myotis (Myotis lucifugus)",
                 "Red Bat (Lasiurus borealis)",
@@ -136,74 +140,91 @@ if check_password():
                 "Other"
             ])
         with col2:
-            location = st.text_input("Geographic Origin (City, State / Facility)")
-            notes = st.text_area("Clinical / Behavioral Notes (e.g., ground-found, neurological signs)")
+            location = st.text_input("Geographic Origin (City, State / Facility) *")
+            notes = st.text_area("Clinical / Behavioral Notes (e.g., ground-found, neurological signs) *")
 
-        audio_file = st.file_uploader("Upload Bat Call Audio (.wav / .mp3)", type=["wav", "mp3"])
+        audio_file = st.file_uploader("Upload Bat Call Audio (.wav / .mp3) *", type=["wav", "mp3"])
         submitted_analysis = st.form_submit_button("Analyze Call & Send Report", type="primary")
 
-    if submitted_analysis and audio_file is not None:
-        st.audio(audio_file)
-        
-        try:
-            audio_bytes = audio_file.getvalue()
+    if submitted_analysis:
+        # --- MANDATORY FORM VALIDATION ---
+        missing_fields = []
+        if not submitter_name: missing_fields.append("Submitting Organization / Rescuer Name")
+        if suspected_species == "Select Species...": missing_fields.append("Suspected / Visual Species ID")
+        if not location: missing_fields.append("Geographic Origin")
+        if not notes: missing_fields.append("Clinical / Behavioral Notes")
+        if audio_file is None: missing_fields.append("Audio File Upload")
+
+        if missing_fields:
+            st.error(f"⚠️ Please complete the following required fields before submitting: {', '.join(missing_fields)}")
+        else:
+            st.audio(audio_file)
             
-            # Save temporarily to process with librosa
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
-                tmp_file.write(audio_bytes)
-                tmp_path = tmp_file.name
+            try:
+                audio_bytes = audio_file.getvalue()
+                
+                # Save temporarily to process with librosa
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
+                    tmp_file.write(audio_bytes)
+                    tmp_path = tmp_file.name
 
-            y, sr = librosa.load(tmp_path, sr=None)
-            os.unlink(tmp_path) # Clean up temp file
-            
-            # --- AUTOMATED PULSE SEGMENTATION ---
-            intervals = librosa.effects.split(y, top_db=25)
+                y, sr = librosa.load(tmp_path, sr=None)
+                os.unlink(tmp_path) # Clean up temp file
+                
+                # --- AUTOMATED MULTI-PULSE SEGMENTATION ---
+                intervals = librosa.effects.split(y, top_db=25)
 
-            if len(intervals) > 0:
-                start_idx, end_idx = intervals[0]
-                y_segmented = y[start_idx:end_idx]
-            else:
-                y_segmented = y  # Fallback to whole file if no distinct call is isolated
+                st.info(f"📊 **Acoustic Scan Complete:** Detected **{len(intervals)}** distinct vocalization pulses/events in the recording.")
 
-            # Extract linear-frequency MFCCs from the segmented call
-            S = np.abs(librosa.stft(y_segmented, n_fft=2048, hop_length=512))
-            S_db = librosa.amplitude_to_db(S, ref=np.max)
-            mfccs = librosa.feature.mfcc(S=S_db, n_mfcc=40)
-            mfccs_mean = np.mean(mfccs.T, axis=0).reshape(1, -1)
+                if len(intervals) > 0:
+                    start_idx, end_idx = intervals[0]
+                    y_segmented = y[start_idx:end_idx]
+                else:
+                    y_segmented = y  
 
-            model = joblib.load('bat_model.pkl')
-            scaler = joblib.load('scaler.pkl')
-            le = joblib.load('label_encoder.pkl')
+                with st.expander("View Detected Pulse Intervals (Timestamps)"):
+                    for i, (start, end) in enumerate(intervals):
+                        st.write(f"Pulse {i+1}: Start {start/sr:.2f}s — End {end/sr:.2f}s (Duration: {(end-start)/sr:.3f}s)")
 
-            X_scaled = scaler.transform(mfccs_mean)
-            prediction_idx = model.predict(X_scaled)[0]
-            probabilities = model.predict_proba(X_scaled)[0]
+                # Extract linear-frequency MFCCs from the segmented call
+                S = np.abs(librosa.stft(y_segmented, n_fft=2048, hop_length=512))
+                S_db = librosa.amplitude_to_db(S, ref=np.max)
+                mfccs = librosa.feature.mfcc(S=S_db, n_mfcc=40)
+                mfccs_mean = np.mean(mfccs.T, axis=0).reshape(1, -1)
 
-            class_label = le.inverse_transform([prediction_idx])[0]
-            confidence = probabilities[prediction_idx] * 100
+                model = joblib.load('bat_model.pkl')
+                scaler = joblib.load('scaler.pkl')
+                le = joblib.load('label_encoder.pkl')
 
-            # Display results
-            st.subheader("Diagnostic Output")
-            st.metric(label="Predicted Class", value=class_label.upper(), delta=f"{confidence:.2f}% Confidence")
+                X_scaled = scaler.transform(mfccs_mean)
+                prediction_idx = model.predict(X_scaled)[0]
+                probabilities = model.predict_proba(X_scaled)[0]
 
-            # Spectrogram Visualization
-            fig, ax = plt.subplots(figsize=(10, 3.5))
-            S_mel = librosa.feature.melspectrogram(y=y_segmented, sr=sr, n_mels=128)
-            S_dB_mel = librosa.power_to_db(S_mel, ref=np.max)
-            img = librosa.display.specshow(S_dB_mel, sr=sr, x_axis='time', y_axis='mel', ax=ax, cmap='magma')
-            ax.set(title='Mel-Frequency Spectrogram (Isolated Pulse)')
-            fig.colorbar(img, ax=ax, format='%+2.0f dB')
-            st.pyplot(fig)
+                class_label = le.inverse_transform([prediction_idx])[0]
+                confidence = probabilities[prediction_idx] * 100
 
-            # Trigger Email Dispatch
-            metadata = {
-                "submitter": submitter_name or "Not Specified",
-                "species": suspected_species,
-                "location": location or "Not Specified",
-                "notes": notes or "None"
-            }
-            send_email_alert(audio_bytes, audio_file.name, class_label, confidence, metadata)
-            st.success("Diagnostic report generated and email notification dispatched successfully!")
+                # Display results
+                st.subheader("Diagnostic Output")
+                st.metric(label="Predicted Class", value=class_label.upper(), delta=f"{confidence:.2f}% Confidence")
 
-        except Exception as e:
-            st.error(f"Error processing audio file: {e}")
+                # Spectrogram Visualization
+                fig, ax = plt.subplots(figsize=(10, 3.5))
+                S_mel = librosa.feature.melspectrogram(y=y_segmented, sr=sr, n_mels=128)
+                S_dB_mel = librosa.power_to_db(S_mel, ref=np.max)
+                img = librosa.display.specshow(S_dB_mel, sr=sr, x_axis='time', y_axis='mel', ax=ax, cmap='magma')
+                ax.set(title='Mel-Frequency Spectrogram (Isolated Primary Pulse)')
+                fig.colorbar(img, ax=ax, format='%+2.0f dB')
+                st.pyplot(fig)
+
+                # Trigger Email Dispatch
+                metadata = {
+                    "submitter": submitter_name,
+                    "species": suspected_species,
+                    "location": location,
+                    "notes": notes
+                }
+                send_email_alert(audio_bytes, audio_file.name, class_label, confidence, metadata)
+                st.success("Diagnostic report generated and email notification dispatched successfully!")
+
+            except Exception as e:
+                st.error(f"Error processing audio file: {e}")
