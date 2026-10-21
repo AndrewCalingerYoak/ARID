@@ -30,7 +30,7 @@ with st.sidebar:
     """)
 
     st.divider()
-     st.subheader("Co Investigators")
+    st.subheader("Co Investigators")
     st.markdown("""
     **Dr Chloe Goodwin**
     *University of Georgia*
