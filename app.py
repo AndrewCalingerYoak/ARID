@@ -5,8 +5,26 @@ import librosa.display
 import joblib
 import matplotlib.pyplot as plt
 
+
+
 # Page configuration
 st.set_page_config(page_title="ARID - Bat Classifier", page_icon="🦇", layout="wide")
+
+# --- CUSTOM CSS TO WIDEN THE SIDEBAR ---
+st.markdown(
+    """
+    <style>
+    [data-testid="stSidebar"] {
+        min-width: 350px;
+        max-width: 450px;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+# --- SIDEBAR: AUTHOR INFO, COMMENTARY & LOGOS ---
+with st.sidebar:
 
 # --- SIDEBAR: AUTHOR INFO, COMMENTARY & LOGOS ---
 with st.sidebar:
@@ -40,7 +58,7 @@ with st.sidebar:
     st.divider()
     
     st.subheader("Partner Organizations")
-    st.markdown("Special thanks to our collaborating institutions and wildlife centers providing data acquisition and ecological support:")
+    st.markdown("Special thanks to our collaborating institutions and wildlife centers providing data acquisition and support:")
     
     # You can swap these with local image filenames once uploaded to GitHub, e.g., st.image("otterbein_logo.png", width=150)
     st.markdown("* Otterbein University")
