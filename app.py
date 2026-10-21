@@ -53,7 +53,7 @@ with st.sidebar:
     *University of Georgia*  
 
     **Colin McCabe**  
-    *Collaborator*
+    *Collaborator & Co-Investigator*
     """)
     
     st.divider()
@@ -121,7 +121,7 @@ def check_password():
 
 if check_password():
     st.title("🦇 Bat Acoustic Rabies Identifier (ARID)")
-    st.markdown("Upload a bat vocalization audio file and complete all metadata fields below to run automated pulse detection, classification, and email reporting.")
+    st.markdown("Upload a bat vocalization audio file and complete all metadata fields below to run automated multi-pulse detection, classification summary, and email reporting.")
 
     # --- BAT METADATA INPUT FORM ---
     with st.form("bat_metadata_form"):
@@ -171,92 +171,106 @@ if check_password():
                 y, sr = librosa.load(tmp_path, sr=None)
                 os.unlink(tmp_path) # Clean up temp file
                 
-                # --- AUTOMATED MULTI-PULSE SEGMENTATION ---
-                # --- AUTOMATED MULTI-PULSE CLASSIFICATION ---
-            intervals = librosa.effects.split(y, top_db=25)
+                # --- AUTOMATED MULTI-PULSE SEGMENTATION & ANALYSIS ---
+                intervals = librosa.effects.split(y, top_db=25)
 
-            st.info(f"📊 **Acoustic Scan Complete:** Detected **{len(intervals)}** distinct vocalization pulses/events.")
+                st.info(f"📊 **Acoustic Scan Complete:** Detected **{len(intervals)}** distinct vocalization pulses/events in the recording.")
 
-            if len(intervals) > 0:
-                model = joblib.load('bat_model.pkl')
-                scaler = joblib.load('scaler.pkl')
-                le = joblib.load('label_encoder.pkl')
+                if len(intervals) > 0:
+                    model = joblib.load('bat_model.pkl')
+                    scaler = joblib.load('scaler.pkl')
+                    le = joblib.load('label_encoder.pkl')
 
-                pulse_results = []
-                
-                # Loop through each detected pulse
-                for i, (start, end) in enumerate(intervals):
-                    y_pulse = y[start:end]
+                    pulse_results = []
                     
-                    # Skip pulses that are too short to analyze accurately (< 0.05 seconds)
-                    if (end - start) / sr < 0.05:
-                        continue
+                    # Evaluate each detected pulse
+                    for i, (start, end) in enumerate(intervals):
+                        y_pulse = y[start:end]
+                        
+                        # Skip pulses shorter than 0.05 seconds to avoid noise artifacts
+                        if (end - start) / sr < 0.05:
+                            continue
 
-                    # Extract features
-                    S = np.abs(librosa.stft(y_pulse, n_fft=2048, hop_length=512))
+                        S = np.abs(librosa.stft(y_pulse, n_fft=2048, hop_length=512))
+                        S_db = librosa.amplitude_to_db(S, ref=np.max)
+                        mfccs = librosa.feature.mfcc(S=S_db, n_mfcc=40)
+                        mfccs_mean = np.mean(mfccs.T, axis=0).reshape(1, -1)
+
+                        X_scaled = scaler.transform(mfccs_mean)
+                        pred_idx = model.predict(X_scaled)[0]
+                        probs = model.predict_proba(X_scaled)[0]
+
+                        label = le.inverse_transform([pred_idx])[0]
+                        conf = probs[pred_idx] * 100
+
+                        pulse_results.append({
+                            "Pulse": f"Pulse {i+1}",
+                            "Start (s)": f"{start/sr:.2f}s",
+                            "End (s)": f"{end/sr:.2f}s",
+                            "Prediction": label.upper(),
+                            "Confidence": f"{conf:.2f}%"
+                        })
+
+                    if pulse_results:
+                        st.subheader("Multi-Pulse Analysis Summary Table")
+                        st.table(pulse_results)
+                        
+                        # Select the highest-confidence pulse for the main display and email report
+                        best_pulse = max(pulse_results, key=lambda x: float(x['Confidence'].strip('%')))
+                        class_label = best_pulse['Prediction'].lower()
+                        confidence = float(best_pulse['Confidence'].strip('%'))
+                        
+                        # Grab the specific audio slice of the best pulse for visualization
+                        best_idx = int(best_pulse['Pulse'].replace("Pulse ", "")) - 1
+                        p_start, p_end = intervals[best_idx]
+                        y_segmented = y[p_start:p_end]
+                    else:
+                        st.warning("Detected pulses were too brief for feature extraction; analyzing full track.")
+                        y_segmented = y
+                        S = np.abs(librosa.stft(y_segmented, n_fft=2048, hop_length=512))
+                        S_db = librosa.amplitude_to_db(S, ref=np.max)
+                        mfccs = librosa.feature.mfcc(S=S_db, n_mfcc=40)
+                        mfccs_mean = np.mean(mfccs.T, axis=0).reshape(1, -1)
+
+                        model = joblib.load('bat_model.pkl')
+                        scaler = joblib.load('scaler.pkl')
+                        le = joblib.load('label_encoder.pkl')
+
+                        X_scaled = scaler.transform(mfccs_mean)
+                        prediction_idx = model.predict(X_scaled)[0]
+                        probabilities = model.predict_proba(X_scaled)[0]
+
+                        class_label = le.inverse_transform([prediction_idx])[0]
+                        confidence = probabilities[prediction_idx] * 100
+                else:
+                    st.warning("No distinct vocalization pulses isolated; analyzing entire file track.")
+                    y_segmented = y
+                    S = np.abs(librosa.stft(y_segmented, n_fft=2048, hop_length=512))
                     S_db = librosa.amplitude_to_db(S, ref=np.max)
                     mfccs = librosa.feature.mfcc(S=S_db, n_mfcc=40)
                     mfccs_mean = np.mean(mfccs.T, axis=0).reshape(1, -1)
 
+                    model = joblib.load('bat_model.pkl')
+                    scaler = joblib.load('scaler.pkl')
+                    le = joblib.load('label_encoder.pkl')
+
                     X_scaled = scaler.transform(mfccs_mean)
-                    pred_idx = model.predict(X_scaled)[0]
-                    probs = model.predict_proba(X_scaled)[0]
+                    prediction_idx = model.predict(X_scaled)[0]
+                    probabilities = model.predict_proba(X_scaled)[0]
 
-                    label = le.inverse_transform([pred_idx])[0]
-                    conf = probs[pred_idx] * 100
+                    class_label = le.inverse_transform([prediction_idx])[0]
+                    confidence = probabilities[prediction_idx] * 100
 
-                    pulse_results.append({
-                        "Pulse": f"Pulse {i+1}",
-                        "Start (s)": f"{start/sr:.2f}s",
-                        "End (s)": f"{end/sr:.2f}s",
-                        "Prediction": label.upper(),
-                        "Confidence": f"{conf:.2f}%"
-                    })
-
-                # Display summary table of all pulses
-                if pulse_results:
-                    st.subheader("Multi-Pulse Analysis Summary")
-                    st.table(pulse_results)
-                    
-                    # Use the highest confidence result for the primary metric & email
-                    best_pulse = max(pulse_results, key=lambda x: float(x['Confidence'].strip('%')))
-                    class_label = best_pulse['Prediction'].lower()
-                    confidence = float(best_pulse['Confidence'].strip('%'))
-                else:
-                    st.warning("Pulses detected were too short for reliable feature extraction.")
-                    class_label = "unknown"
-                    confidence = 0.0
-            else:
-                st.warning("No distinct call pulses isolated; analyzing entire file.")
-                # Fallback whole file analysis here...
-
-                # Extract linear-frequency MFCCs from the segmented call
-                S = np.abs(librosa.stft(y_segmented, n_fft=2048, hop_length=512))
-                S_db = librosa.amplitude_to_db(S, ref=np.max)
-                mfccs = librosa.feature.mfcc(S=S_db, n_mfcc=40)
-                mfccs_mean = np.mean(mfccs.T, axis=0).reshape(1, -1)
-
-                model = joblib.load('bat_model.pkl')
-                scaler = joblib.load('scaler.pkl')
-                le = joblib.load('label_encoder.pkl')
-
-                X_scaled = scaler.transform(mfccs_mean)
-                prediction_idx = model.predict(X_scaled)[0]
-                probabilities = model.predict_proba(X_scaled)[0]
-
-                class_label = le.inverse_transform([prediction_idx])[0]
-                confidence = probabilities[prediction_idx] * 100
-
-                # Display results
-                st.subheader("Diagnostic Output")
-                st.metric(label="Predicted Class", value=class_label.upper(), delta=f"{confidence:.2f}% Confidence")
+                # Display primary consensus results
+                st.subheader("Consensus Diagnostic Output")
+                st.metric(label="Primary Predicted Class", value=class_label.upper(), delta=f"{confidence:.2f}% Confidence")
 
                 # Spectrogram Visualization
                 fig, ax = plt.subplots(figsize=(10, 3.5))
                 S_mel = librosa.feature.melspectrogram(y=y_segmented, sr=sr, n_mels=128)
                 S_dB_mel = librosa.power_to_db(S_mel, ref=np.max)
                 img = librosa.display.specshow(S_dB_mel, sr=sr, x_axis='time', y_axis='mel', ax=ax, cmap='magma')
-                ax.set(title='Mel-Frequency Spectrogram (Isolated Primary Pulse)')
+                ax.set(title='Mel-Frequency Spectrogram (Primary Pulse / Segment)')
                 fig.colorbar(img, ax=ax, format='%+2.0f dB')
                 st.pyplot(fig)
 
