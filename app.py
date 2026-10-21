@@ -23,8 +23,6 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# --- SIDEBAR: AUTHOR INFO, COMMENTARY & LOGOS ---
-with st.sidebar:
 
 # --- SIDEBAR: AUTHOR INFO, COMMENTARY & LOGOS ---
 with st.sidebar:
